@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# https://github.com/philyuchkoff/dash2yaml
 # dashtoyaml.sh - Converts Grafana JSON dashboard to YAML format for kube-prometheus-stack
 # with support for prefixes, suffixes, and folders
 
