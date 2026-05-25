@@ -4,14 +4,14 @@ Bash script to convert Grafana JSON dashboards to YAML format for [kube-promethe
 
 ## Features
 
-- ✅ Convert Grafana JSON dashboards to YAML format
-- ✅ Fix template variables from `[[var]]` to `$var` format
-- ✅ Fix datasource references
-- ✅ Add custom prefix/suffix to dashboard UID
-- ✅ Specify folder for dashboards (added as comment)
-- ✅ Custom datasource naming
-- ✅ Force specific UID
-- ✅ Optional YAML formatting via `yq`
+- Convert Grafana JSON dashboards to YAML format
+- Fix template variables from `[[var]]` to `$var` format
+- Fix datasource references
+- Add custom prefix/suffix to dashboard UID
+- Specify folder for dashboards (added as comment)
+- Custom datasource naming
+- Force specific UID
+- Optional YAML formatting via `yq`
 
 ## Requirements
 
@@ -124,6 +124,43 @@ grafana:
           editable: true
           options:
             path: /var/lib/grafana/dashboards/default
+```
+
+## Example
+
+Input JSON (`dashboard.json`):
+
+```
+{
+  "title": "Kubernetes Cluster Monitoring",
+  "uid": "cluster-monitoring",
+  "panels": [...],
+  "templating": {
+    "list": [...]
+  }
+}
+```
+
+Output YAML (`dashboards/cluster.yaml`):
+
+```
+# cluster.yaml
+# Automated generated from dashboard.json
+# 2026-05-25 10:30:00
+# Directory: Production Dashboards
+# Datasource: Prometheus
+
+title: Kubernetes Cluster Monitoring
+uid: prod_cluster-monitoring_v1
+version: 1
+tags:
+  - kubernetes
+  - monitoring
+panels:
+  - ...
+templating:
+  list:
+    - ...
 ```
 
 ## License
