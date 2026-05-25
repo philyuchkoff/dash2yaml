@@ -1,24 +1,24 @@
 #!/bin/bash
 
-# dashtoyaml.sh - Конвертирует JSON дашборд Grafana в YAML формат для kube-prometheus-stack
-# с поддержкой префиксов, суффиксов и папок
+# dashtoyaml.sh - Converts Grafana JSON dashboard to YAML format for kube-prometheus-stack
+# with support for prefixes, suffixes, and folders
 
 #=======================
-### КАК ПОЛЬЗОВАТЬСЯ ###
+### HOW TO USE ###
 #=======================
-## Базовое использование
+## Basic usage
 #./dashtoyaml.sh dashboard.json dashboards/dashboard.yaml
 #
-## С префиксом и суффиксом для UID
+## With prefix and suffix for UID
 #./dashtoyaml.sh dashboard.json dashboards/dashboard.yaml --prefix prod_ --suffix _v1
 #
-## С указанием папки
+## With folder specification
 #./dashtoyaml.sh dashboard.json dashboards/dashboard.yaml --folder "Production Dashboards"
 #
-## С заменой лейблов и reporter
+## With label replacement and reporter fix
 #./dashtoyaml.sh istio-dashboard.json dashboards/istio.yaml --replace-labels --fix-reporter
 #
-## Полный набор опций
+## Full set of options
 #./dashtoyaml.sh dashboard.json dashboards/my.yaml \
 #  --prefix stage_ \
 #  --suffix _2024 \
@@ -27,38 +27,38 @@
 #  --replace-labels \
 #  --fix-reporter
 #
-## Принудительная установка UID (без добавления панели инструкции)
+## Force UID (without adding walkthrough panel)
 #./dashtoyaml.sh dashboard.json dashboards/my.yaml --uid custom-uid --no-walkthrough
 
 set -e
 
-# Цвета для вывода
+# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Функция вывода справки
+# Function to display help
 usage() {
-    echo -e "${BLUE}Использование:${NC} $0 <input.json> <output.yaml> [options]"
+    echo -e "${BLUE}Usage:${NC} $0 <input.json> <output.yaml> [options]"
     echo ""
-    echo -e "${BLUE}Опции:${NC}"
-    echo "  --prefix TEXT       Добавить префикс к UID"
-    echo "  --suffix TEXT       Добавить суффикс к UID"
-    echo "  --folder NAME       Указать папку для дашборда (добавляется в комментарий)"
-    echo "  --datasource NAME   Имя datasource (по умолчанию: Prometheus)"
-    echo "  --uid NAME          Принудительно установить UID"
-    echo "  --help              Показать эту справку"
+    echo -e "${BLUE}Options:${NC}"
+    echo "  --prefix TEXT       Add prefix to UID"
+    echo "  --suffix TEXT       Add suffix to UID"
+    echo "  --folder NAME       Specify folder for dashboard (added as comment)"
+    echo "  --datasource NAME   Datasource name (default: Prometheus)"
+    echo "  --uid NAME          Force specific UID"
+    echo "  --help              Show this help"
     echo ""
-    echo -e "${BLUE}Примеры:${NC}"
+    echo -e "${BLUE}Examples:${NC}"
     echo "  $0 dashboard.json dashboards/my-dashboard.yaml"
     echo "  $0 dashboard.json dashboards/my-dashboard.yaml --prefix prod --folder 'Production Dashboards'"
     echo "  $0 dashboard.json dashboards/my-dashboard.yaml --datasource 'MyPrometheus'"
     exit 0
 }
 
-# Парсинг аргументов
+# Parse arguments
 INPUT_JSON=""
 OUTPUT_YAML=""
 UID_PREFIX=""
@@ -98,7 +98,7 @@ while [[ $# -gt 0 ]]; do
             elif [ -z "$OUTPUT_YAML" ]; then
                 OUTPUT_YAML="$1"
             else
-                echo -e "${RED}Ошибка: Неизвестный аргумент $1${NC}"
+                echo -e "${RED}Error: Unknown argument $1${NC}"
                 usage
             fi
             shift
@@ -106,45 +106,45 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Проверка аргументов
+# Check arguments
 if [ -z "$INPUT_JSON" ] || [ -z "$OUTPUT_YAML" ]; then
-    echo -e "${RED}Ошибка: Необходимо указать входной и выходной файлы${NC}"
+    echo -e "${RED}Error: Input and output files are required${NC}"
     usage
 fi
 
-# Проверка существования входного файла
+# Check if input file exists
 if [ ! -f "$INPUT_JSON" ]; then
-    echo -e "${RED}Ошибка: Файл $INPUT_JSON не найден${NC}"
+    echo -e "${RED}Error: File $INPUT_JSON not found${NC}"
     exit 1
 fi
 
-# Проверка наличия jq
+# Check if jq is installed
 if ! command -v jq &> /dev/null; then
-    echo -e "${RED}Ошибка: jq не установлен. Установите jq:${NC}"
+    echo -e "${RED}Error: jq is not installed. Install jq:${NC}"
     echo "  Ubuntu/Debian: sudo apt-get install jq"
     echo "  CentOS/RHEL: sudo yum install jq"
     echo "  MacOS: brew install jq"
     exit 1
 fi
 
-echo -e "${GREEN}🔧 Обработка дашборда...${NC}"
-echo -e "${BLUE}   Входной файл:${NC} $INPUT_JSON"
-echo -e "${BLUE}   Выходной файл:${NC} $OUTPUT_YAML"
+echo -e "${GREEN}🔧 Processing dashboard...${NC}"
+echo -e "${BLUE}   Input file:${NC} $INPUT_JSON"
+echo -e "${BLUE}   Output file:${NC} $OUTPUT_YAML"
 echo ""
 
-# Создаем временный файл для обработанного JSON
+# Create temporary file for processed JSON
 TEMP_JSON=$(mktemp)
 
-# Копируем исходный JSON во временный файл
+# Copy source JSON to temporary file
 cp "$INPUT_JSON" "$TEMP_JSON"
 
-# Функция: исправление переменных шаблона из формата [[var]] в формат $var
+# Function: fix template variables from [[var]] to $var format
 fix_template_variables() {
     local file="$1"
     
-    echo -e "  ${GREEN}✔${NC} Конвертация переменных шаблона из [[var]] в \$var..."
+    echo -e "  ${GREEN}✔${NC} Converting template variables from [[var]] to \$var..."
     
-    # Создаем временный скрипт Python для обработки
+    # Create temporary Python script for processing
     local python_script="/tmp/fix_vars_$$.py"
     
     cat > "$python_script" << 'PYTHON_EOF'
@@ -163,8 +163,8 @@ def fix_vars(obj):
     elif isinstance(obj, list):
         return [fix_vars(item) for item in obj]
     elif isinstance(obj, str):
-        # Заменяем [[var]] на $var
-        # Используем raw string для правильной обработки
+        # Replace [[var]] with $var
+        # Use raw string for proper handling
         return re.sub(r'\[\[([^\]]+)\]\]', r'$\1', obj)
     else:
         return obj
@@ -181,18 +181,18 @@ PYTHON_EOF
     rm -f "$python_script"
 }
 
-# Функция: исправление datasource в targets (расширенная версия)
+# Function: fix datasource in targets (extended version)
 fix_datasources() {
     local file="$1"
     local ds_name="$2"
     
-    echo -e "  ${GREEN}✔${NC} Исправление datasource ссылок на '$ds_name'..."
+    echo -e "  ${GREEN}✔${NC} Fixing datasource references to '$ds_name'..."
     
     jq --arg ds_name "$ds_name" --arg ds_uid "$ds_name" '
-    # Функция для создания правильного объекта datasource
+    # Function to create correct datasource object
     def fix_ds:
         if type == "string" then
-            # Обработка строковых ссылок на datasource
+            # Handle string datasource references
             if . == "${datasource}" or . == "$datasource" or 
                . == "${DS_PROMETHEUS}" or . == "$DS_PROMETHEUS" or
                . == "prometheus" or . == "Prometheus" then
@@ -205,7 +205,7 @@ fix_datasources() {
                 .
             end
         elif type == "object" then
-            # Обработка объекта datasource
+            # Handle datasource object
             if .uid == "${datasource}" or .uid == "$datasource" or 
                .uid == "${DS_PROMETHEUS}" or .uid == "$DS_PROMETHEUS" or
                .uid == "prometheus" or .uid == "Prometheus" or
@@ -222,7 +222,7 @@ fix_datasources() {
             .
         end;
     
-    # Рекурсивно обрабатываем все вхождения datasource
+    # Recursively process all datasource occurrences
     def recursive_fix:
         walk(
             if type == "object" then
@@ -238,37 +238,37 @@ fix_datasources() {
     ' "$file" > "${file}.tmp" && mv "${file}.tmp" "$file"
 }
 
-# Функция: установка UID
+# Function: set UID
 set_uid() {
     local file="$1"
     local uid="$2"
     
-    echo -e "  ${GREEN}✔${NC} Установка UID: $uid"
+    echo -e "  ${GREEN}✔${NC} Setting UID: $uid"
     
     jq --arg uid "$uid" '.uid = $uid' "$file" > "${file}.tmp" && mv "${file}.tmp" "$file"
 }
 
-# Функция: добавление аннотации с папкой
+# Function: add annotation with folder
 add_folder_annotation() {
     local file="$1"
     local folder="$2"
     
-    echo -e "  ${GREEN}✔${NC} Добавление аннотации папки '$folder'..."
+    echo -e "  ${GREEN}✔${NC} Adding folder annotation '$folder'..."
     
-    # Добавляем комментарий в YAML, а не аннотацию в JSON
-    # Аннотации в JSON могут быть перезаписаны
+    # Add comment in YAML instead of annotation in JSON
+    # JSON annotations may be overwritten
 }
 
-# Функция: добавление панели-инструкции
+# Function: add instruction panel
 add_walkthrough_panel() {
     local file="$1"
     local title="$2"
     
-    echo -e "  ${GREEN}✔${NC} Добавление панели Dashboard Walkthrough..."
+    echo -e "  ${GREEN}✔${NC} Adding Dashboard Walkthrough panel..."
     
-    # Проверяем, есть ли уже панель с инструкцией
+    # Check if instruction panel already exists
     if jq -e '.panels[] | select(.title=="Dashboard Walkthrough")' "$file" > /dev/null 2>&1; then
-        echo -e "  ${YELLOW}⚠ Панель Walkthrough уже существует, пропускаем${NC}"
+        echo -e "  ${YELLOW}⚠ Walkthrough panel already exists, skipping${NC}"
         return
     fi
     
@@ -285,7 +285,7 @@ add_walkthrough_panel() {
                 "y": 0
             },
             "options": {
-                "content": "# 🏥 " + $title + "\n\n**Что показывает дашборд:**\n\n**Как читать:** Наведите на заголовок панели для описания причин и действий.\n\n**Версия:** kube-prometheus-stack v85.0.2 (KSM v2.14+)",
+                "content": "# 🏥 " + $title + "\n\n**What this dashboard shows:**\n\n**How to read:** Hover over panel title for description of causes and actions.\n\n**Version:** kube-prometheus-stack v85.0.2 (KSM v2.14+)",
                 "mode": "markdown"
             },
             "pluginVersion": "12.2.1"
@@ -293,7 +293,7 @@ add_walkthrough_panel() {
     ] + .panels
     ' "$file" > "${file}.tmp" && mv "${file}.tmp" "$file"
     
-    # Сдвигаем y координаты всех панелей
+    # Shift y coordinates of all panels
     jq '
     def shift_y(amount):
         if .gridPos and .gridPos.y then
@@ -306,7 +306,7 @@ add_walkthrough_panel() {
     ' "$file" > "${file}.tmp" && mv "${file}.tmp" "$file"
 }
 
-# Функция: конвертация JSON в YAML
+# Function: convert JSON to YAML
 convert_to_yaml() {
     local input="$1"
     local output="$2"
@@ -315,19 +315,19 @@ convert_to_yaml() {
     
     {
         echo "# $(basename "$output")"
-        echo "# Автоматически сгенерировано из $(basename "$INPUT_JSON")"
+        echo "# Automatically generated from $(basename "$INPUT_JSON")"
         echo "# $(date '+%Y-%m-%d %H:%M:%S')"
         
-        # Добавляем информацию о папке в комментарий
+        # Add folder information as comment
         if [ -n "$FOLDER_NAME" ]; then
-            echo "# Папка: $FOLDER_NAME"
+            echo "# Folder: $FOLDER_NAME"
         fi
         
-        # Добавляем информацию о datasource
+        # Add datasource information
         echo "# Datasource: $DATASOURCE_NAME"
         echo "# yamllint disable-line-length"
         echo ""
-        echo "---"  # Document start для yamllint
+        echo "---"  # Document start for yamllint
         echo ""
         
         echo "title: $title"
@@ -378,7 +378,7 @@ convert_to_yaml() {
                     echo "    - name: $(echo "$item" | jq -r '.name // "unnamed"')"
                     echo "      type: $(echo "$item" | jq -r '.type // "query"')"
                     
-                    # Проверяем все важные поля
+                    # Check all important fields
                     local all_value=$(echo "$item" | jq -r '.allValue // ""' 2>/dev/null)
                     if [ -n "$all_value" ] && [ "$all_value" != "null" ]; then
                         echo "      allValue: $all_value"
@@ -409,13 +409,13 @@ convert_to_yaml() {
                         echo "      options: $options"
                     fi
                     
-                    # Проверяем тип для правильной обработки query
+                    # Check type for correct query handling
                     local item_type=$(echo "$item" | jq -r '.type // "query"')
                     if [ "$item_type" == "query" ]; then
-                        # Для query типа поле query является объектом
+                        # For query type, the query field is an object
                         local query_obj=$(echo "$item" | jq -c '.query // {}')
                         if [ "$query_obj" != "{}" ] && [ "$query_obj" != "null" ]; then
-                            # Проверяем, есть ли подполе query в объекте query
+                            # Check if there is a query subfield in the query object
                             local nested_query=$(echo "$item" | jq -r '.query.query // ""' 2>/dev/null)
                             local ref_id=$(echo "$item" | jq -r '.query.refId // ""' 2>/dev/null)
                             if [ -n "$nested_query" ] && [ "$nested_query" != "null" ]; then
@@ -425,12 +425,12 @@ convert_to_yaml() {
                                     echo "        refId: $ref_id"
                                 fi
                             else
-                                # Выводим весь объект
+                                # Output the entire object
                                 echo "      query: $query_obj"
                             fi
                         fi
                     else
-                        # Для других типов query может быть строкой
+                        # For other types, query may be a string
                         local query=$(echo "$item" | jq -r '.query // ""' 2>/dev/null)
                         if [ -n "$query" ] && [ "$query" != "null" ]; then
                             echo "      query: $query"
@@ -459,7 +459,7 @@ convert_to_yaml() {
     } > "$output"
 }
 
-# Выполнение функций
+# Execute functions
 fix_template_variables "$TEMP_JSON"
 fix_datasources "$TEMP_JSON" "$DATASOURCE_NAME"
 
@@ -471,22 +471,22 @@ elif [ -n "$UID_PREFIX" ] || [ -n "$UID_SUFFIX" ]; then
     set_uid "$TEMP_JSON" "$NEW_UID"
 fi
 
-# Добавляем панель инструкции (опционально, можно отключить)
-# add_walkthrough_panel "$TEMP_JSON" "$TITLE"
+    # Add instruction panel (optional, can be disabled)
+    # add_walkthrough_panel "$TEMP_JSON" "$TITLE"
 
 convert_to_yaml "$TEMP_JSON" "$OUTPUT_YAML"
 
-# Очистка
+# Cleanup
 rm -f "$TEMP_JSON"
 
-# Форматирование через yq (если установлен)
+# Format via yq (if installed)
 if command -v yq &> /dev/null; then
-    echo -e "  ${GREEN}✔${NC} Форматирование YAML через yq..."
+    echo -e "  ${GREEN}✔${NC} Formatting YAML via yq..."
     yq eval -P "$OUTPUT_YAML" -o yaml > "${OUTPUT_YAML}.tmp" 2>/dev/null && mv "${OUTPUT_YAML}.tmp" "$OUTPUT_YAML"
 fi
 
-# Замена одинарных кавычек на двойные для переменных в expr полях
-echo -e "  ${GREEN}✔${NC} Исправление кавычек в expr полях..."
+# Replace single quotes with double quotes for variables in expr fields
+echo -e "  ${GREEN}✔${NC} Fixing quotes in expr fields..."
 
 python_script="/tmp/fix_quotes_$$.py"
 
@@ -499,12 +499,12 @@ output_file = sys.argv[1]
 with open(output_file, 'r') as f:
     content = f.read()
 
-# Заменяем одинарные кавычки на двойные для переменных в строках с expr
+# Replace single quotes with double quotes for variables in expr lines
 lines = content.split('\n')
 result = []
 for line in lines:
     if 'expr:' in line:
-        # Заменяем '$var' на "$var" для известных переменных
+        # Replace '$var' with "$var" for known variables
         line = re.sub(r"'(\$client_id)'", r'"\1"', line)
         line = re.sub(r"'(\$instance)'", r'"\1"', line)
         line = re.sub(r"'(\$aggr_criteria)'", r'"\1"', line)
@@ -519,6 +519,6 @@ python3 "$python_script" "$OUTPUT_YAML"
 rm -f "$python_script"
 
 echo ""
-echo -e "${GREEN}✅ Дашборд успешно сконвертирован!${NC}"
-echo -e "${BLUE}   Входной файл:${NC} $INPUT_JSON"
-echo -e "${BLUE}   Выходной файл:${NC} $OUTPUT_YAML"
+echo -e "${GREEN}✅ Dashboard successfully converted!${NC}"
+echo -e "${BLUE}   Input file:${NC} $INPUT_JSON"
+echo -e "${BLUE}   Output file:${NC} $OUTPUT_YAML"
